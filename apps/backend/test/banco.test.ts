@@ -6,6 +6,7 @@ import * as schema from '../src/db/schema.js'
 import { lerEnv } from '../src/env.js'
 import { bancoResponde, criarDb } from '../src/plugins/db.js'
 import { erroDoPostgres } from '../src/plugins/erros.js'
+import { criarRepositorioPerfis } from '../src/perfis.js'
 
 try {
   process.loadEnvFile()
@@ -53,6 +54,24 @@ describe.skipIf(!url)('banco (integração)', () => {
       { nome: 'Matéria-Prima', peso: 3 },
       { nome: 'Comerciais', peso: 1 },
     ])
+  })
+
+  it('lê o perfil com a situação da senha calculada no banco', async () => {
+    const [admin] = await db
+      .select({ id: schema.perfis.id })
+      .from(schema.perfis)
+      .where(eq(schema.perfis.email, 'engenharia1@rotexmaquinas.com.br'))
+    if (!admin) return // ambiente sem o admin inicial
+    const perfil = await criarRepositorioPerfis(db).buscar(admin.id)
+    expect(perfil).toMatchObject({ papel: 'admin', ativo: true })
+    expect(typeof perfil?.trocaSenhaPendente).toBe('boolean')
+  })
+
+  it('não lê a tabela de senhas provisórias', async () => {
+    const erro = await db
+      .execute(sql`select 1 from public.senhas_provisorias limit 1`)
+      .catch((e: unknown) => e)
+    expect(erroDoPostgres(erro)?.code).toBe('42501')
   })
 
   it('não tem acesso ao schema auth', async () => {

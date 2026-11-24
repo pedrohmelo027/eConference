@@ -76,7 +76,10 @@ função "Extrair relatório".
 ## Usuários e papéis
 
 Cada usuário tem **um** papel. Não existe cadastro público: quem cria usuários
-é o administrador.
+é o administrador, sempre com uma **senha provisória**. No primeiro acesso o
+sistema obriga a definir uma senha pessoal (pelo menos 8 caracteres, com letras e
+números) antes de liberar qualquer tela ou rota da API. Se o admin redefinir a
+senha de alguém, a troca volta a ser obrigatória.
 
 | Papel        | Quem é                              | Pode                                                                                     | Não pode                                                                                      |
 | ------------ | ----------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -327,7 +330,9 @@ supabase/
 │   ├── 20261124180000_estrutura.sql     # tipos, tabelas, índices, processos iniciais
 │   ├── 20261124180100_regras.sql        # gatilhos: regras de negócio e auditoria
 │   ├── 20261124180200_views.sql         # vw_itens_saldo, vw_solicitacoes_resumo, vw_projetos_resumo
-│   └── 20261124180300_acesso.sql        # papel econference_api, privilégios, RLS
+│   ├── 20261124180300_acesso.sql        # papel econference_api, privilégios, RLS
+│   └── 20261124190000_primeiro_acesso.sql # senha provisória e troca obrigatória (UC01)
+├── scripts/criar-admin.sql              # cria o primeiro admin de um ambiente
 ├── seed.sql                             # dados de desenvolvimento (projetos + solicitação de exemplo)
 └── tests/regras.sql                     # testes das regras no banco (transação desfeita)
 ```
@@ -389,6 +394,27 @@ API responde **422** com essa mensagem.
 O usuário da auditoria vem de `app.usuario_id`, que a API define em cada
 transação (`emNomeDe(db, usuarioId, fn)` em `apps/backend/src/plugins/db.ts`).
 
+### Primeiro acesso (troca obrigatória de senha)
+
+Não existe uma flag que o cliente possa mudar. Ao definir uma senha provisória,
+`public.registrar_senha_provisoria(usuario)` guarda o hash dela em
+`senhas_provisorias` (tabela que nem a API lê). `public.troca_senha_pendente(usuario)`
+compara com a senha atual do Supabase Auth: enquanto forem iguais, a troca está
+pendente. O usuário troca a senha pelo Supabase Auth no front, o hash muda e a
+pendência some sozinha.
+
+- `GET /me` devolve `trocaSenhaPendente`; o front leva para `/primeiro-acesso`.
+- `app.exigirPapel(...)` responde **403** "Defina uma nova senha antes de
+  continuar." em qualquer outra rota enquanto a troca estiver pendente.
+- Primeiro admin de cada ambiente: `supabase/scripts/criar-admin.sql` no SQL
+  Editor. Em `econference-dev`: `engenharia1@rotexmaquinas.com.br`.
+
+**E-mail de redefinição ("Esqueci minha senha"):** o SMTP padrão do Supabase só
+entrega para e-mails da equipe do projeto Supabase e tem limite baixo de envios.
+Antes do piloto, configure um SMTP próprio em Authentication → Emails e adicione
+as URLs do front (ex.: `https://<front>/redefinir-senha`) em Authentication → URL
+Configuration.
+
 ### Acesso
 
 - **O front não acessa o banco.** `anon` e `authenticated` não têm nenhum
@@ -427,7 +453,7 @@ O `admin` tem acesso a todas.
 | Rota                                                                                                           | Papéis (além do admin) | Caso de uso |
 | -------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------- |
 | `GET /health`, `GET /openapi.json`                                                                             | sem login              | —           |
-| `GET /me`                                                                                                      | todos                  | UC01        |
+| `GET /me` (perfil, papel e `trocaSenhaPendente`)                                                               | todos                  | UC01        |
 | `/usuarios`, `/processos` (escrita)                                                                            | —                      | UC02, UC03  |
 | `/projetos` (escrita)                                                                                          | engenharia             | UC04        |
 | `GET /planilha-modelo`, `POST /importacoes/previa`, `POST /importacoes`                                        | engenharia             | UC05        |
@@ -575,16 +601,16 @@ pnpm typecheck && pnpm test && pnpm build`. O CI roda o mesmo.
 O projeto é feito **por partes, um caso de uso por vez**. Cada parte é revisada
 e aprovada antes da próxima.
 
-| Fase | Entrega                                                                                                        | Situação                              |
-| ---- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| 0    | Definições: casos de uso, regras, planilha modelo, README                                                      | ✅ concluída (revisão em andamento)   |
-| 1    | Fundação: monorepo, config, API com `/health` e `/me`, web conectando à API, CI                                | ✅ concluída (PR #1)                  |
-| 2    | Banco: projeto Supabase, migrations, RLS, views de saldo, seed, Drizzle na API                                 | ✅ branch `fase-2/banco` (em revisão) |
-| 3    | Administração: login, papéis, usuários, processos (UC01–UC03)                                                  | ⏳                                    |
-| 4    | Engenharia: projetos, planilha modelo, importação, cadastro manual, edição/cancelamento, liberação (UC04–UC08) | ⏳                                    |
-| 5    | Produção: consulta, busca por código, recebimento, estorno (UC09–UC12)                                         | ⏳                                    |
-| 6    | PCP: painel, relatório XLSX/PDF, histórico (UC13–UC15)                                                         | ⏳                                    |
-| 7    | Piloto com uma carga real, em paralelo com a planilha atual                                                    | ⏳                                    |
+| Fase | Entrega                                                                                                        | Situação                               |
+| ---- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 0    | Definições: casos de uso, regras, planilha modelo, README                                                      | ✅ concluída (revisão em andamento)    |
+| 1    | Fundação: monorepo, config, API com `/health` e `/me`, web conectando à API, CI                                | ✅ concluída (PR #1)                   |
+| 2    | Banco: projeto Supabase, migrations, RLS, views de saldo, seed, Drizzle na API                                 | ✅ branch `fase-2/banco` (em revisão)  |
+| 3    | Administração: login, papéis, usuários, processos (UC01–UC03)                                                  | 🔄 UC01 na branch `fase-3/uc01-entrar` |
+| 4    | Engenharia: projetos, planilha modelo, importação, cadastro manual, edição/cancelamento, liberação (UC04–UC08) | ⏳                                     |
+| 5    | Produção: consulta, busca por código, recebimento, estorno (UC09–UC12)                                         | ⏳                                     |
+| 6    | PCP: painel, relatório XLSX/PDF, histórico (UC13–UC15)                                                         | ⏳                                     |
+| 7    | Piloto com uma carga real, em paralelo com a planilha atual                                                    | ⏳                                     |
 
 ## Fora do escopo (por enquanto)
 

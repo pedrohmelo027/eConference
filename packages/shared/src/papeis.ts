@@ -12,3 +12,11 @@ export const NOMES_PAPEIS: Record<Papel, string> = {
   producao: 'Produção',
   pcp: 'PCP',
 }
+
+/** Tela inicial de cada papel depois do login (UC01). */
+export const TELA_INICIAL: Record<Papel, string> = {
+  admin: '/painel',
+  engenharia: '/solicitacoes',
+  producao: '/conferencia',
+  pcp: '/painel',
+}

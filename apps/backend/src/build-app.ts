@@ -9,6 +9,8 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod'
 import type { Env } from './env.js'
+import type { RepositorioPerfis } from './perfis.js'
+import { acessoPlugin } from './plugins/acesso.js'
 import { authPlugin } from './plugins/auth.js'
 import { dbPlugin, type Db } from './plugins/db.js'
 import { registrarTratamentoDeErros } from './plugins/erros.js'
@@ -21,10 +23,12 @@ export interface OpcoesApp {
   logger?: boolean
   /** Para testes: injeta um banco (ou `null` para nenhum). Padrão: conecta em DATABASE_URL. */
   db?: Db | null
+  /** Para testes: perfis em memória. Padrão: tabela `perfis` do banco. */
+  perfis?: RepositorioPerfis
 }
 
 /** Monta a aplicação (plugins + rotas). Usado pelo server.ts e pelos testes. */
-export async function buildApp({ env, logger = false, db }: OpcoesApp) {
+export async function buildApp({ env, logger = false, db, perfis }: OpcoesApp) {
   const app = Fastify({ logger }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)
@@ -50,6 +54,7 @@ export async function buildApp({ env, logger = false, db }: OpcoesApp) {
   })
   await app.register(authPlugin, { env })
   await app.register(dbPlugin, db === undefined ? { env } : { env, db })
+  await app.register(acessoPlugin, { perfis })
 
   await app.register(healthRoutes)
   await app.register(meRoutes)

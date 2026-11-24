@@ -1,6 +1,6 @@
 import { MeResponseSchema } from '@econference/shared'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { criarApp, gerarToken, USUARIO_ID } from './helpers.js'
+import { comoUsuario, criarApp, gerarToken, USUARIO_ID, USUARIOS } from './helpers.js'
 
 describe('GET /me', () => {
   let app: Awaited<ReturnType<typeof criarApp>>
@@ -16,13 +16,50 @@ describe('GET /me', () => {
       headers: authorization ? { authorization } : {},
     })
 
-  it('devolve o usuário do token', async () => {
+  it('devolve o perfil do usuário do token', async () => {
     const res = await get(`Bearer ${await gerarToken()}`)
     expect(res.statusCode).toBe(200)
     expect(MeResponseSchema.parse(res.json())).toEqual({
       id: USUARIO_ID,
-      email: 'engenharia@rotex.com.br',
+      email: 'engenharia@rotexmaquinas.com.br',
+      nome: 'Usuário engenharia',
+      papel: 'engenharia',
+      trocaSenhaPendente: false,
     })
+  })
+
+  it('responde para quem ainda precisa trocar a senha (o front leva ao primeiro acesso)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/me',
+      headers: await comoUsuario(USUARIOS.trocaPendente),
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json<{ trocaSenhaPendente: boolean }>().trocaSenhaPendente).toBe(true)
+  })
+
+  it('403 para usuário sem perfil', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/me',
+      headers: await comoUsuario(USUARIOS.semPerfil),
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json<{ message: string }>().message).toBe(
+      'Usuário sem acesso ao eConference. Procure o administrador.',
+    )
+  })
+
+  it('403 para usuário desativado', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/me',
+      headers: await comoUsuario(USUARIOS.desativado),
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json<{ message: string }>().message).toBe(
+      'Usuário desativado. Procure o administrador.',
+    )
   })
 
   it('401 sem token', async () => {
