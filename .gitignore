@@ -1,0 +1,21 @@
+# dependências
+node_modules/
+
+# builds
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+
+# ambiente (só os .env.example vão para o Git)
+.env
+.env.*
+!.env.example
+
+# ferramentas
+.vercel/
+.omc/
+.DS_Store
+*.log
