@@ -26,6 +26,23 @@ describe('GET /health', () => {
     expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000')
   })
 
+  it.each(['PATCH', 'PUT', 'DELETE'])(
+    'libera o método %s na consulta prévia (preflight)',
+    async (metodo) => {
+      const res = await app.inject({
+        method: 'OPTIONS',
+        url: '/usuarios/qualquer',
+        headers: {
+          origin: 'http://localhost:3000',
+          'access-control-request-method': metodo,
+          'access-control-request-headers': 'authorization,content-type',
+        },
+      })
+      expect(res.statusCode).toBe(204)
+      expect(String(res.headers['access-control-allow-methods'])).toContain(metodo)
+    },
+  )
+
   it('não libera CORS para outra origem', async () => {
     const res = await app.inject({
       method: 'GET',

@@ -67,8 +67,14 @@ vai para o almoxarifado e **não é controlado** pelo eConference nesta versão.
 ### UC02 — Gerenciar usuários e papéis
 
 **Ator:** Administrador.
-**Fluxo:** cria usuário (nome, e-mail, papel) → convite por e-mail; altera papel ou desativa.
-**Regras:** usuário desativado não entra, mas o histórico dele continua; um papel por usuário.
+**Fluxo:** lista os usuários (papel, situação, primeiro acesso pendente) → cria usuário (nome, e-mail, papel e **senha provisória**, que pode ser gerada) → entrega a senha provisória ao usuário, que define a própria no primeiro acesso (UC01). Também: edita nome e papel; desativa ou reativa; redefine a senha (nova senha provisória).
+**Regras:**
+
+- usuário desativado não entra (o login é bloqueado também no Supabase Auth e a sessão aberta perde o acesso), mas o histórico dele continua;
+- um papel por usuário; e-mail único;
+- redefinir a senha torna a troca obrigatória de novo no próximo acesso;
+- o administrador não pode se desativar nem tirar o próprio papel de administrador; o sistema nunca fica sem administrador ativo;
+- criação, alterações e senhas provisórias definidas ficam no histórico (UC15), sem a senha.
 
 ### UC03 — Gerenciar processos e pesos
 
