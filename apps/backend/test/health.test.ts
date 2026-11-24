@@ -1,0 +1,62 @@
+import { HealthResponseSchema } from '@econference/shared'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { criarApp } from './helpers.js'
+
+describe('GET /health', () => {
+  let app: Awaited<ReturnType<typeof criarApp>>
+  beforeAll(async () => {
+    app = await criarApp()
+  })
+  afterAll(() => app.close())
+
+  it('responde sem token', async () => {
+    const res = await app.inject({ method: 'GET', url: '/health' })
+    expect(res.statusCode).toBe(200)
+    expect(HealthResponseSchema.parse(res.json()).status).toBe('ok')
+  })
+
+  it('libera CORS para a origem do front', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'http://localhost:3000' },
+    })
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000')
+  })
+
+  it('não libera CORS para outra origem', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'https://outro-site.com' },
+    })
+    expect(res.headers['access-control-allow-origin']).toBeUndefined()
+  })
+})
+
+describe('rotas gerais', () => {
+  let app: Awaited<ReturnType<typeof criarApp>>
+  beforeAll(async () => {
+    app = await criarApp()
+  })
+  afterAll(() => app.close())
+
+  it('responde 404 em português', async () => {
+    const res = await app.inject({ method: 'GET', url: '/nao-existe' })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({
+      statusCode: 404,
+      error: 'Not Found',
+      message: 'Rota GET /nao-existe não encontrada.',
+    })
+  })
+
+  it('publica o OpenAPI com /health e /me', async () => {
+    const res = await app.inject({ method: 'GET', url: '/openapi.json' })
+    expect(res.statusCode).toBe(200)
+    const doc = res.json<{ openapi: string; paths: Record<string, unknown> }>()
+    expect(doc.openapi).toMatch(/^3\./)
+    expect(Object.keys(doc.paths)).toEqual(expect.arrayContaining(['/health', '/me']))
+    expect(Object.keys(doc.paths)).not.toContain('/openapi.json')
+  })
+})
