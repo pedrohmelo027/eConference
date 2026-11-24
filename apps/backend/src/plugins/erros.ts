@@ -68,7 +68,8 @@ export function registrarTratamentoDeErros(app: FastifyInstance) {
         ? Number(erro.statusCode)
         : 500
 
-    if (statusCode >= 400 && statusCode < 500) {
+    // 4xx e 503 (serviço indisponível) são erros previstos: a mensagem vai para o cliente
+    if ((statusCode >= 400 && statusCode < 500) || statusCode === 503) {
       const mensagem = erro instanceof Error ? erro.message : 'Requisição inválida.'
       return reply.status(statusCode).send({
         statusCode,

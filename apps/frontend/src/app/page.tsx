@@ -1,14 +1,22 @@
-import { StatusApi } from '@/components/status-api'
+'use client'
 
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { Carregando } from '@/components/carregando'
+import { destinoDoUsuario, useMe } from '@/hooks/use-me'
+import { useSessao } from '@/hooks/use-sessao'
+
+/** Início: manda para o login ou para a tela inicial do papel (UC01). */
 export default function Inicio() {
-  return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-6 px-4 py-12">
-      <header>
-        <p className="text-sm font-medium text-zinc-500">Rotex Máquinas</p>
-        <h1 className="text-3xl font-semibold tracking-tight">eConference</h1>
-        <p className="mt-1 text-zinc-600 dark:text-zinc-400">Conferência de recebimento</p>
-      </header>
-      <StatusApi />
-    </main>
-  )
+  const router = useRouter()
+  const { carregando, sessao } = useSessao()
+  const me = useMe()
+
+  useEffect(() => {
+    if (carregando) return
+    if (!sessao || me.isError) router.replace('/entrar')
+    else if (me.data) router.replace(destinoDoUsuario(me.data))
+  }, [carregando, sessao, me.data, me.isError, router])
+
+  return <Carregando />
 }

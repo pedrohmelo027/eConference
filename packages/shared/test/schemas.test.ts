@@ -3,8 +3,10 @@ import {
   HealthResponseSchema,
   MeResponseSchema,
   NOMES_PAPEIS,
+  NovaSenhaSchema,
   PAPEIS,
   PapelSchema,
+  TELA_INICIAL,
 } from '../src/index.js'
 
 describe('papéis', () => {
@@ -30,11 +32,27 @@ describe('schemas', () => {
     expect(r.success).toBe(true)
   })
 
-  it('exige id uuid em /me e aceita e-mail nulo', () => {
-    expect(MeResponseSchema.safeParse({ id: 'abc', email: null }).success).toBe(false)
-    expect(
-      MeResponseSchema.safeParse({ id: '6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5b', email: null })
-        .success,
-    ).toBe(true)
+  it('/me exige id uuid e papel conhecido', () => {
+    const me = {
+      id: '6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5b',
+      email: 'a@rotexmaquinas.com.br',
+      nome: 'A',
+      papel: 'pcp',
+      trocaSenhaPendente: false,
+    }
+    expect(MeResponseSchema.safeParse(me).success).toBe(true)
+    expect(MeResponseSchema.safeParse({ ...me, id: 'abc' }).success).toBe(false)
+    expect(MeResponseSchema.safeParse({ ...me, papel: 'compras' }).success).toBe(false)
+  })
+
+  it('nova senha: 8+ caracteres com letra e número', () => {
+    expect(NovaSenhaSchema.safeParse('Rotex2026').success).toBe(true)
+    expect(NovaSenhaSchema.safeParse('curta1').success).toBe(false)
+    expect(NovaSenhaSchema.safeParse('somenteletras').success).toBe(false)
+    expect(NovaSenhaSchema.safeParse('12345678').success).toBe(false)
+  })
+
+  it('toda tela inicial começa com /', () => {
+    for (const papel of PAPEIS) expect(TELA_INICIAL[papel]).toMatch(/^\//)
   })
 })

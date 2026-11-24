@@ -31,7 +31,13 @@ pnpm --filter @econference/backend test
 - TypeScript 6 (não 7: typescript-eslint ainda não suporta). No TS 6 o padrão
   de `types` é `[]`, por isso o `tsconfig.base.json` declara `"types": ["node"]`.
 - Erros da API: `{ statusCode, error, message }`, mensagem em português.
-- Rotas protegidas: `onRequest: [app.authenticate]` e `usuarioDaRequisicao(request)`.
+- Rotas protegidas: `onRequest: [app.authenticate, app.exigirPapel('engenharia')]` (admin
+  sempre passa; sem papéis = qualquer usuário ativo). `exigirPapel` também bloqueia quem tem
+  troca de senha pendente. Perfil: `await app.carregarPerfil(request)`.
+- Testes da API usam perfis em memória (`test/helpers.ts`: `USUARIOS`, `comoUsuario(id)`).
+- Front: Supabase só para login/sessão (`lib/supabase.ts`); dados sempre via API (`lib/api.ts`,
+  TanStack Query). Telas logadas ficam em `src/app/(logado)/` e são `'use client'`.
+- Se o `next dev` servir CSS antigo, apague `apps/frontend/.next` (cache do Turbopack).
 - Toda rota nova: teste de sucesso, 401 sem token e (a partir da Fase 3) 403.
 - Recebimentos: só `INSERT`; correção é estorno. Saldo/status são calculados.
 - O recebido de um item nunca passa do solicitado (RN11).

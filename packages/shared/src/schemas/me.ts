@@ -1,8 +1,13 @@
 import { z } from 'zod'
+import { PapelSchema } from '../papeis.js'
 
-/** Usuário identificado pelo token. O papel (tabela `perfis`) entra na Fase 3. */
+/** Usuário logado: dados do token + perfil (tabela `perfis`). */
 export const MeResponseSchema = z.object({
   id: z.uuid(),
-  email: z.email().nullable(),
+  email: z.string(),
+  nome: z.string(),
+  papel: PapelSchema,
+  /** Senha ainda é a provisória: o front leva para /primeiro-acesso e a API bloqueia as demais rotas. */
+  trocaSenhaPendente: z.boolean(),
 })
 export type MeResponse = z.infer<typeof MeResponseSchema>

@@ -60,8 +60,9 @@ vai para o almoxarifado e **não é controlado** pelo eConference nesta versão.
 
 **Ator:** todos.
 **Fluxo:** informa e-mail e senha → sistema abre a tela inicial do papel (Engenharia → solicitações; Produção → conferência; PCP → painel; Admin → painel).
-**Alternativos:** credenciais inválidas → erro; usuário sem papel ou desativado → aviso para procurar o administrador; esqueceu a senha → link por e-mail.
-**Regra:** não há cadastro público; só o administrador cria usuários.
+**Primeiro acesso:** o usuário entra com a senha provisória definida pelo administrador → sistema exige uma senha pessoal (mín. 8 caracteres, com letras e números, diferente da provisória) → depois abre a tela inicial do papel. Enquanto não trocar, nenhuma outra tela ou rota fica disponível. Vale também quando o admin redefine a senha de alguém.
+**Alternativos:** credenciais inválidas → erro; usuário sem papel ou desativado → aviso para procurar o administrador; esqueceu a senha → link por e-mail para definir uma nova.
+**Regra:** não há cadastro público; só o administrador cria usuários, sempre com senha provisória.
 
 ### UC02 — Gerenciar usuários e papéis
 

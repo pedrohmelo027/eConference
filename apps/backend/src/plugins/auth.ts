@@ -3,7 +3,7 @@ import fp from 'fastify-plugin'
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyOptions } from 'jose'
 import type { Env } from '../env.js'
 
-/** Usuário identificado pelo access token do Supabase. O papel vem da tabela `perfis` (Fase 3). */
+/** Usuário identificado pelo access token do Supabase. O papel vem da tabela `perfis` (plugins/acesso). */
 export interface UsuarioToken {
   id: string
   email: string | null
