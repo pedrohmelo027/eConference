@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
 import { Aviso } from '@/components/aviso'
 import { Carregando } from '@/components/carregando'
+import { Navegacao } from '@/components/navegacao'
 import { Button } from '@/components/ui/button'
 import { useMe } from '@/hooks/use-me'
 import { useSessao } from '@/hooks/use-sessao'
@@ -47,25 +48,36 @@ export function AreaLogada({ children }: { children: ReactNode }) {
       </main>
     )
   }
-  if (!me.data || me.data.trocaSenhaPendente) return <Carregando />
 
+  const pronto = Boolean(me.data && !me.data.trocaSenhaPendente)
+
+  // A página é sempre renderizada (escondida até a sessão ser confirmada) para o Next conseguir
+  // validá-la. Não expõe dados: as páginas só consultam a API com token e usam <Restrito>.
   return (
     <>
-      <header className="border-b bg-background">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-4">
-          <span className="font-semibold">eConference</span>
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm text-muted-foreground">
-              {me.data.nome} · {NOMES_PAPEIS[me.data.papel]}
-            </span>
-            <Button variant="ghost" className="h-11 px-3" onClick={sair} aria-label="Sair">
-              <LogOut />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
-          </div>
-        </div>
-      </header>
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6">{children}</div>
+      {!pronto && <Carregando />}
+      <div hidden={!pronto} className="flex flex-1 flex-col">
+        {me.data && (
+          <>
+            <header className="border-b bg-background">
+              <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-3 px-4">
+                <span className="font-semibold">eConference</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm text-muted-foreground">
+                    {me.data.nome} · {NOMES_PAPEIS[me.data.papel]}
+                  </span>
+                  <Button variant="ghost" className="h-11 px-3" onClick={sair} aria-label="Sair">
+                    <LogOut />
+                    <span className="hidden sm:inline">Sair</span>
+                  </Button>
+                </div>
+              </div>
+            </header>
+            <Navegacao papel={me.data.papel} />
+          </>
+        )}
+        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6">{children}</div>
+      </div>
     </>
   )
 }

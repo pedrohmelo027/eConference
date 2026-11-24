@@ -331,7 +331,8 @@ supabase/
 │   ├── 20261124180100_regras.sql        # gatilhos: regras de negócio e auditoria
 │   ├── 20261124180200_views.sql         # vw_itens_saldo, vw_solicitacoes_resumo, vw_projetos_resumo
 │   ├── 20261124180300_acesso.sql        # papel econference_api, privilégios, RLS
-│   └── 20261124190000_primeiro_acesso.sql # senha provisória e troca obrigatória (UC01)
+│   ├── 20261124190000_primeiro_acesso.sql # senha provisória e troca obrigatória (UC01)
+│   └── 20261124200000_usuarios.sql      # senha provisória vai para o histórico (UC02)
 ├── scripts/criar-admin.sql              # cria o primeiro admin de um ambiente
 ├── seed.sql                             # dados de desenvolvimento (projetos + solicitação de exemplo)
 └── tests/regras.sql                     # testes das regras no banco (transação desfeita)
@@ -407,7 +408,11 @@ pendência some sozinha.
 - `app.exigirPapel(...)` responde **403** "Defina uma nova senha antes de
   continuar." em qualquer outra rota enquanto a troca estiver pendente.
 - Primeiro admin de cada ambiente: `supabase/scripts/criar-admin.sql` no SQL
-  Editor. Em `econference-dev`: `engenharia1@rotexmaquinas.com.br`.
+  Editor. Em `econference-dev`: `engenharia1@rotexmaquinas.com.br`. Os demais
+  usuários são criados pelo admin na tela **Usuários** (UC02), que usa a Admin API
+  do Supabase Auth com `SUPABASE_SECRET_KEY` e chama `registrar_senha_provisoria`.
+- Desativar um usuário: `perfis.ativo = false` e bloqueio no Supabase Auth
+  (`ban_duration`); reativar desfaz os dois.
 
 **E-mail de redefinição ("Esqueci minha senha"):** o SMTP padrão do Supabase só
 entrega para e-mails da equipe do projeto Supabase e tem limite baixo de envios.
@@ -454,7 +459,8 @@ O `admin` tem acesso a todas.
 | -------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------- |
 | `GET /health`, `GET /openapi.json`                                                                             | sem login              | —           |
 | `GET /me` (perfil, papel e `trocaSenhaPendente`)                                                               | todos                  | UC01        |
-| `/usuarios`, `/processos` (escrita)                                                                            | —                      | UC02, UC03  |
+| `GET/POST /usuarios`, `PATCH /usuarios/:id`, `POST /usuarios/:id/redefinir-senha`                              | —                      | UC02        |
+| `/processos` (escrita)                                                                                         | —                      | UC03        |
 | `/projetos` (escrita)                                                                                          | engenharia             | UC04        |
 | `GET /planilha-modelo`, `POST /importacoes/previa`, `POST /importacoes`                                        | engenharia             | UC05        |
 | `POST /solicitacoes`, `PATCH /solicitacoes/:id`, `POST /solicitacoes/:id/cancelar`, `POST /itens/:id/cancelar` | engenharia             | UC06, UC07  |
@@ -534,7 +540,8 @@ Para um pacote só: `pnpm --filter @econference/backend test`.
 | backend  | `PORT`, `HOST`                                                     | só local (padrão 3333 / 0.0.0.0)                                                  |
 | backend  | `CORS_ORIGIN`                                                      | origens do front, separadas por vírgula                                           |
 | backend  | `SUPABASE_URL`                                                     | `https://<ref>.supabase.co`                                                       |
-| backend  | `SUPABASE_JWT_SECRET`                                              | opcional, só para chave legada HS256                                              |
+| backend  | `SUPABASE_JWT_SECRET`                                              | opcional, só para chave legada HS256 (deixe vazia: o projeto usa ES256/JWKS)      |
+| backend  | `SUPABASE_SECRET_KEY`                                              | chave secreta `sb_secret_...` (Admin API do Auth, UC02). Nunca vai para o front   |
 | backend  | `DATABASE_URL`                                                     | pooler do Supabase com `econference_api` (veja [Banco de dados](#banco-de-dados)) |
 | frontend | `NEXT_PUBLIC_API_URL`                                              | URL da API                                                                        |
 | frontend | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | login                                                                             |
@@ -545,10 +552,10 @@ Nunca versionar `.env`. Só os `.env.example` vão para o Git.
 
 Dois projetos na Vercel apontando para este repositório:
 
-| Projeto                | Root Directory  | Framework | Variáveis                                       |
-| ---------------------- | --------------- | --------- | ----------------------------------------------- |
-| `econference-frontend` | `apps/frontend` | Next.js   | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_*` |
-| `econference-backend`  | `apps/backend`  | Fastify   | `CORS_ORIGIN`, `SUPABASE_URL`, `DATABASE_URL`   |
+| Projeto                | Root Directory  | Framework | Variáveis                                                            |
+| ---------------------- | --------------- | --------- | -------------------------------------------------------------------- |
+| `econference-frontend` | `apps/frontend` | Next.js   | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_*`                      |
+| `econference-backend`  | `apps/backend`  | Fastify   | `CORS_ORIGIN`, `SUPABASE_URL`, `DATABASE_URL`, `SUPABASE_SECRET_KEY` |
 
 O `vercel.json` de cada app roda o build pelo Turborepo a partir da raiz, para
 o `packages/shared` ser compilado antes. Banco e Auth ficam no Supabase, com um
@@ -601,16 +608,16 @@ pnpm typecheck && pnpm test && pnpm build`. O CI roda o mesmo.
 O projeto é feito **por partes, um caso de uso por vez**. Cada parte é revisada
 e aprovada antes da próxima.
 
-| Fase | Entrega                                                                                                        | Situação                               |
-| ---- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| 0    | Definições: casos de uso, regras, planilha modelo, README                                                      | ✅ concluída (revisão em andamento)    |
-| 1    | Fundação: monorepo, config, API com `/health` e `/me`, web conectando à API, CI                                | ✅ concluída (PR #1)                   |
-| 2    | Banco: projeto Supabase, migrations, RLS, views de saldo, seed, Drizzle na API                                 | ✅ branch `fase-2/banco` (em revisão)  |
-| 3    | Administração: login, papéis, usuários, processos (UC01–UC03)                                                  | 🔄 UC01 na branch `fase-3/uc01-entrar` |
-| 4    | Engenharia: projetos, planilha modelo, importação, cadastro manual, edição/cancelamento, liberação (UC04–UC08) | ⏳                                     |
-| 5    | Produção: consulta, busca por código, recebimento, estorno (UC09–UC12)                                         | ⏳                                     |
-| 6    | PCP: painel, relatório XLSX/PDF, histórico (UC13–UC15)                                                         | ⏳                                     |
-| 7    | Piloto com uma carga real, em paralelo com a planilha atual                                                    | ⏳                                     |
+| Fase | Entrega                                                                                                        | Situação                                                   |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 0    | Definições: casos de uso, regras, planilha modelo, README                                                      | ✅ concluída (revisão em andamento)                        |
+| 1    | Fundação: monorepo, config, API com `/health` e `/me`, web conectando à API, CI                                | ✅ concluída (PR #1)                                       |
+| 2    | Banco: projeto Supabase, migrations, RLS, views de saldo, seed, Drizzle na API                                 | ✅ branch `fase-2/banco` (em revisão)                      |
+| 3    | Administração: login, papéis, usuários, processos (UC01–UC03)                                                  | 🔄 UC01 ✅ (PR #3) · UC02 na branch `fase-3/uc02-usuarios` |
+| 4    | Engenharia: projetos, planilha modelo, importação, cadastro manual, edição/cancelamento, liberação (UC04–UC08) | ⏳                                                         |
+| 5    | Produção: consulta, busca por código, recebimento, estorno (UC09–UC12)                                         | ⏳                                                         |
+| 6    | PCP: painel, relatório XLSX/PDF, histórico (UC13–UC15)                                                         | ⏳                                                         |
+| 7    | Piloto com uma carga real, em paralelo com a planilha atual                                                    | ⏳                                                         |
 
 ## Fora do escopo (por enquanto)
 

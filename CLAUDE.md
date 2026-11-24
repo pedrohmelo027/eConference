@@ -38,6 +38,11 @@ pnpm --filter @econference/backend test
 - Front: Supabase só para login/sessão (`lib/supabase.ts`); dados sempre via API (`lib/api.ts`,
   TanStack Query). Telas logadas ficam em `src/app/(logado)/` e são `'use client'`.
 - Se o `next dev` servir CSS antigo, apague `apps/frontend/.next` (cache do Turbopack).
+- CORS: métodos liberados em `build-app.ts` (o padrão do @fastify/cors é só GET/HEAD/POST).
+  `app.inject` não passa pelo CORS: teste o preflight (`OPTIONS`) quando criar método novo.
+- `AreaLogada` sempre renderiza a página (escondida até a sessão carregar) para o Next validar
+  a navegação instantânea. Telas com dados: `<Restrito papeis={[...]}>` + consulta com token.
+- Admin API do Supabase (criar usuário, senha, bloqueio): `apps/backend/src/auth-admin.ts`.
 - Toda rota nova: teste de sucesso, 401 sem token e (a partir da Fase 3) 403.
 - Recebimentos: só `INSERT`; correção é estorno. Saldo/status são calculados.
 - O recebido de um item nunca passa do solicitado (RN11).

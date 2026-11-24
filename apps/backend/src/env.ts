@@ -21,6 +21,8 @@ const EnvSchema = z.object({
   SUPABASE_JWT_SECRET: opcional(z.string()),
   /** Pooler do Supabase, porta 6543, usuário econference_api.<ref>. Sem ela a API sobe sem banco. */
   DATABASE_URL: opcional(z.url()),
+  /** Chave secreta (sb_secret_...) para a Admin API do Supabase Auth (UC02). Nunca vai ao front. */
+  SUPABASE_SECRET_KEY: opcional(z.string()),
 })
 
 export type Env = z.infer<typeof EnvSchema>

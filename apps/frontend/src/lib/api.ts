@@ -44,3 +44,19 @@ export async function apiGet<T>(
   }
   return schema.parse(corpo)
 }
+
+/** POST/PATCH/PUT/DELETE com corpo JSON, validando a resposta. */
+export function apiEnviar<T>(
+  metodo: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+  caminho: string,
+  schema: z.ZodType<T>,
+  corpo: unknown,
+  opcoes: OpcoesApi = {},
+): Promise<T> {
+  return apiGet(caminho, schema, {
+    ...opcoes,
+    method: metodo,
+    headers: { ...opcoes.headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo),
+  })
+}
