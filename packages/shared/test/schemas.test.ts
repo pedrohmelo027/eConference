@@ -25,6 +25,7 @@ describe('schemas', () => {
       servico: 'econference-api',
       versao: '0.1.0',
       horario: new Date().toISOString(),
+      banco: 'ok',
     })
     expect(r.success).toBe(true)
   })

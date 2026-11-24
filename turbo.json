@@ -19,7 +19,9 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env"],
+      "env": ["DATABASE_URL"]
     }
   }
 }

@@ -13,8 +13,9 @@ export const envTeste = lerEnv({
   CORS_ORIGIN: 'http://localhost:3000',
 })
 
+/** App sem banco (db: null). Testes de integração com banco usam DATABASE_URL (banco.test.ts). */
 export function criarApp() {
-  return buildApp({ env: envTeste })
+  return buildApp({ env: envTeste, db: null })
 }
 
 interface OpcoesToken {

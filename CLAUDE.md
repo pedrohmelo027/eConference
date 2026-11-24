@@ -35,3 +35,10 @@ pnpm --filter @econference/backend test
 - Toda rota nova: teste de sucesso, 401 sem token e (a partir da Fase 3) 403.
 - Recebimentos: só `INSERT`; correção é estorno. Saldo/status são calculados.
 - O recebido de um item nunca passa do solicitado (RN11).
+- Banco: projeto Supabase `econference-dev` (ref `avopmfkwbmvvlgjrkqyf`). O SQL das
+  migrations é a fonte da verdade; `apps/backend/src/db/schema.ts` só espelha.
+  Escritas da API vão em `emNomeDe(db, usuarioId, fn)` (auditoria com o usuário).
+- A API conecta como `econference_api` (sem DDL, sem UPDATE/DELETE em lançamentos).
+  Regras do banco viram 422 (P0001) com a mensagem do gatilho.
+- Ao aplicar migration pelo MCP, alinhe a versão em `supabase_migrations.schema_migrations`
+  com o nome do arquivo.

@@ -5,5 +5,6 @@ export const HealthResponseSchema = z.object({
   servico: z.literal('econference-api'),
   versao: z.string(),
   horario: z.iso.datetime(),
+  banco: z.enum(['ok', 'indisponivel', 'nao_configurado']),
 })
 export type HealthResponse = z.infer<typeof HealthResponseSchema>
