@@ -10,6 +10,7 @@ import {
 } from 'fastify-type-provider-zod'
 import type { Env } from './env.js'
 import { authPlugin } from './plugins/auth.js'
+import { dbPlugin, type Db } from './plugins/db.js'
 import { registrarTratamentoDeErros } from './plugins/erros.js'
 import { healthRoutes } from './routes/health.js'
 import { meRoutes } from './routes/me.js'
@@ -18,10 +19,12 @@ import { VERSAO_API } from './versao.js'
 export interface OpcoesApp {
   env: Env
   logger?: boolean
+  /** Para testes: injeta um banco (ou `null` para nenhum). Padrão: conecta em DATABASE_URL. */
+  db?: Db | null
 }
 
 /** Monta a aplicação (plugins + rotas). Usado pelo server.ts e pelos testes. */
-export async function buildApp({ env, logger = false }: OpcoesApp) {
+export async function buildApp({ env, logger = false, db }: OpcoesApp) {
   const app = Fastify({ logger }).withTypeProvider<ZodTypeProvider>()
 
   app.setValidatorCompiler(validatorCompiler)
@@ -46,6 +49,7 @@ export async function buildApp({ env, logger = false }: OpcoesApp) {
     transform: jsonSchemaTransform,
   })
   await app.register(authPlugin, { env })
+  await app.register(dbPlugin, db === undefined ? { env } : { env, db })
 
   await app.register(healthRoutes)
   await app.register(meRoutes)

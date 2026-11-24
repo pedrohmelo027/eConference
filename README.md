@@ -24,7 +24,7 @@ percentuais.
 7. [A planilha modelo](#a-planilha-modelo)
 8. [Arquitetura](#arquitetura)
 9. [Stack](#stack)
-10. [Modelo de dados (planejado)](#modelo-de-dados-planejado)
+10. [Banco de dados](#banco-de-dados)
 11. [API](#api)
 12. [Estrutura do repositório](#estrutura-do-repositório)
 13. [Rodando localmente](#rodando-localmente)
@@ -314,7 +314,25 @@ legada HS256, use `SUPABASE_JWT_SECRET`. O papel do usuário vem da tabela
 | Lint / formato  | ESLint (10 na API/shared, 9 no web) + Prettier 3 | —      |                                                                                       |
 | Hospedagem      | Vercel (web e API) + Supabase                    | —      |                                                                                       |
 
-## Modelo de dados (planejado)
+## Banco de dados
+
+Postgres no Supabase. Projeto de desenvolvimento: **`econference-dev`**
+(ref `avopmfkwbmvvlgjrkqyf`, região `sa-east-1`, São Paulo). O de produção será
+criado no deploy.
+
+```
+supabase/
+├── config.jsonc                         # Supabase CLI (banco local, seed)
+├── migrations/
+│   ├── 20261124180000_estrutura.sql     # tipos, tabelas, índices, processos iniciais
+│   ├── 20261124180100_regras.sql        # gatilhos: regras de negócio e auditoria
+│   ├── 20261124180200_views.sql         # vw_itens_saldo, vw_solicitacoes_resumo, vw_projetos_resumo
+│   └── 20261124180300_acesso.sql        # papel econference_api, privilégios, RLS
+├── seed.sql                             # dados de desenvolvimento (projetos + solicitação de exemplo)
+└── tests/regras.sql                     # testes das regras no banco (transação desfeita)
+```
+
+### Modelo
 
 ```
 perfis (autor de tudo)
@@ -346,6 +364,60 @@ Views:
 
 Não serão registrados: fornecedor, pedido de compra, prazo, unidade, NF e
 sobras.
+
+O mapeamento das tabelas para a API (Drizzle) fica em
+`apps/backend/src/db/schema.ts`. A fonte da verdade é o SQL das migrations: o
+Drizzle não gera migrations.
+
+### Regras garantidas no banco
+
+Os gatilhos repetem as regras que a API valida, para que nenhum caminho as
+contorne. Erros de regra usam `SQLSTATE P0001` com mensagem em português, e a
+API responde **422** com essa mensagem.
+
+| Regra                                                                                     | Onde                      |
+| ----------------------------------------------------------------------------------------- | ------------------------- |
+| Rascunho não recebe peças; liberação exige item e não volta atrás                         | solicitações, lançamentos |
+| Solicitação/item liberado não é excluído (só cancelado); rascunho pode ser descartado     | solicitações, itens       |
+| Depois de liberada, a quantidade não aumenta nem fica abaixo do recebido (RN09)           | itens                     |
+| Recebido nunca passa do solicitado (RN11), com trava da linha do item contra concorrência | lançamentos               |
+| Estorno: com motivo, mesma quantidade, uma vez só, nunca de outro estorno                 | lançamentos               |
+| Lançamentos e auditoria não são alterados nem apagados (RN08)                             | lançamentos, auditoria    |
+| Projeto encerrado não recebe solicitação                                                  | solicitações              |
+| Todo insert/update/delete vai para `auditoria`, com o usuário da transação                | todas                     |
+
+O usuário da auditoria vem de `app.usuario_id`, que a API define em cada
+transação (`emNomeDe(db, usuarioId, fn)` em `apps/backend/src/plugins/db.ts`).
+
+### Acesso
+
+- **O front não acessa o banco.** `anon` e `authenticated` não têm nenhum
+  privilégio nas tabelas e views; o RLS só tem políticas para a API.
+- **A API conecta com o papel `econference_api`**: sem DDL, sem acesso ao schema
+  `auth`, sem `UPDATE`/`DELETE` em lançamentos. A migration cria o papel sem
+  login; a senha é definida **por ambiente**, no SQL Editor, e nunca vai para o
+  Git:
+
+  ```sql
+  alter role econference_api with login password '<senha forte>' connection limit 30;
+  ```
+
+- `DATABASE_URL` (pooler, modo transaction):
+  `postgresql://econference_api.<ref>:<senha>@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`
+
+### Migrations, seed e testes
+
+- Nova mudança = novo arquivo em `supabase/migrations/` (nunca edite um já
+  aplicado). Aplicar: `pnpm dlx supabase link --project-ref <ref>` e
+  `pnpm dlx supabase db push`, ou pelo SQL Editor / MCP do Supabase mantendo a
+  versão igual ao nome do arquivo em `supabase_migrations.schema_migrations`.
+- `supabase/seed.sql`: só desenvolvimento. Idempotente.
+- `supabase/tests/regras.sql`: rode no SQL Editor; o relatório sai como um erro
+  proposital `RELATORIO` e nada é gravado. Nenhuma linha pode começar com
+  `FALHOU`.
+- `apps/backend/test/banco.test.ts`: integração da API com o banco real (pooler,
+  privilégios, views, erro P0001). Roda quando `DATABASE_URL` está no
+  `apps/backend/.env`; no CI, sem banco, é pulado.
 
 ## API
 
@@ -414,7 +486,7 @@ cp apps/frontend/.env.example apps/frontend/.env.local
 pnpm dev
 ```
 
-- Front: http://localhost:3000 (mostra se a API está conectada)
+- Front: http://localhost:3000 (mostra se a API e o banco estão conectados)
 - API: http://localhost:3333/health
 - OpenAPI: http://localhost:3333/openapi.json
 
@@ -431,15 +503,15 @@ Para um pacote só: `pnpm --filter @econference/backend test`.
 
 ### Variáveis de ambiente
 
-| App      | Variável                                                           | Descrição                                |
-| -------- | ------------------------------------------------------------------ | ---------------------------------------- |
-| backend  | `PORT`, `HOST`                                                     | só local (padrão 3333 / 0.0.0.0)         |
-| backend  | `CORS_ORIGIN`                                                      | origens do front, separadas por vírgula  |
-| backend  | `SUPABASE_URL`                                                     | `https://<ref>.supabase.co`              |
-| backend  | `SUPABASE_JWT_SECRET`                                              | opcional, só para chave legada HS256     |
-| backend  | `DATABASE_URL`                                                     | string do pooler do Supabase, porta 6543 |
-| frontend | `NEXT_PUBLIC_API_URL`                                              | URL da API                               |
-| frontend | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | login                                    |
+| App      | Variável                                                           | Descrição                                                                         |
+| -------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| backend  | `PORT`, `HOST`                                                     | só local (padrão 3333 / 0.0.0.0)                                                  |
+| backend  | `CORS_ORIGIN`                                                      | origens do front, separadas por vírgula                                           |
+| backend  | `SUPABASE_URL`                                                     | `https://<ref>.supabase.co`                                                       |
+| backend  | `SUPABASE_JWT_SECRET`                                              | opcional, só para chave legada HS256                                              |
+| backend  | `DATABASE_URL`                                                     | pooler do Supabase com `econference_api` (veja [Banco de dados](#banco-de-dados)) |
+| frontend | `NEXT_PUBLIC_API_URL`                                              | URL da API                                                                        |
+| frontend | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | login                                                                             |
 
 Nunca versionar `.env`. Só os `.env.example` vão para o Git.
 
@@ -503,16 +575,16 @@ pnpm typecheck && pnpm test && pnpm build`. O CI roda o mesmo.
 O projeto é feito **por partes, um caso de uso por vez**. Cada parte é revisada
 e aprovada antes da próxima.
 
-| Fase | Entrega                                                                                                        | Situação                                 |
-| ---- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| 0    | Definições: casos de uso, regras, planilha modelo, README                                                      | ✅ concluída (revisão em andamento)      |
-| 1    | Fundação: monorepo, config, API com `/health` e `/me`, web conectando à API, CI                                | ✅ branch `fase-1/fundacao` (em revisão) |
-| 2    | Banco: projeto Supabase, migrations, RLS, views de saldo, seed, Drizzle na API                                 | ⏳                                       |
-| 3    | Administração: login, papéis, usuários, processos (UC01–UC03)                                                  | ⏳                                       |
-| 4    | Engenharia: projetos, planilha modelo, importação, cadastro manual, edição/cancelamento, liberação (UC04–UC08) | ⏳                                       |
-| 5    | Produção: consulta, busca por código, recebimento, estorno (UC09–UC12)                                         | ⏳                                       |
-| 6    | PCP: painel, relatório XLSX/PDF, histórico (UC13–UC15)                                                         | ⏳                                       |
-| 7    | Piloto com uma carga real, em paralelo com a planilha atual                                                    | ⏳                                       |
+| Fase | Entrega                                                                                                        | Situação                              |
+| ---- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 0    | Definições: casos de uso, regras, planilha modelo, README                                                      | ✅ concluída (revisão em andamento)   |
+| 1    | Fundação: monorepo, config, API com `/health` e `/me`, web conectando à API, CI                                | ✅ concluída (PR #1)                  |
+| 2    | Banco: projeto Supabase, migrations, RLS, views de saldo, seed, Drizzle na API                                 | ✅ branch `fase-2/banco` (em revisão) |
+| 3    | Administração: login, papéis, usuários, processos (UC01–UC03)                                                  | ⏳                                    |
+| 4    | Engenharia: projetos, planilha modelo, importação, cadastro manual, edição/cancelamento, liberação (UC04–UC08) | ⏳                                    |
+| 5    | Produção: consulta, busca por código, recebimento, estorno (UC09–UC12)                                         | ⏳                                    |
+| 6    | PCP: painel, relatório XLSX/PDF, histórico (UC13–UC15)                                                         | ⏳                                    |
+| 7    | Piloto com uma carga real, em paralelo com a planilha atual                                                    | ⏳                                    |
 
 ## Fora do escopo (por enquanto)
 

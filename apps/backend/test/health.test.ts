@@ -12,7 +12,9 @@ describe('GET /health', () => {
   it('responde sem token', async () => {
     const res = await app.inject({ method: 'GET', url: '/health' })
     expect(res.statusCode).toBe(200)
-    expect(HealthResponseSchema.parse(res.json()).status).toBe('ok')
+    const corpo = HealthResponseSchema.parse(res.json())
+    expect(corpo.status).toBe('ok')
+    expect(corpo.banco).toBe('nao_configurado')
   })
 
   it('libera CORS para a origem do front', async () => {
